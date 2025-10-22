@@ -1,3 +1,4 @@
+import java.io.*;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,13 +52,13 @@ class Menu{
             choice = Integer.parseInt(scanner.nextLine());
             switch (choice) {
                 case 1:
-                    manager.createPoll();
+                    manager.createPoll(user);
                     break;
                 case 2:
-                    manager.vote();
+                    manager.vote(user);
                     break;
                 case 3:
-                    manager.removePoll();
+                    manager.closePoll(user);
                     break;
                 case 4:
                     manager.viewAllPolls();
@@ -80,12 +81,18 @@ class Menu{
 
 
 
-class User{
+class User implements Serializable{
      private String Username;
      private String password;
+     private List<Poll> userCreatedPolls;
      public User(String username,String password){
          this.password=password; this.Username=username;
+         userCreatedPolls=new ArrayList<>();
      }
+
+    public List<Poll> getUserCreatedPolls() {
+        return userCreatedPolls;
+    }
 
     public String getPassword() {
         return password;
@@ -108,7 +115,7 @@ class User{
 
 
 
-class Poll {
+class Poll  implements Serializable{
     private  final String topic;
     private  String status;
     private final  HashMap<String, Integer> votePerChoice;
@@ -134,6 +141,7 @@ class Poll {
     }
 
     public List<User> getVoters() {
+
         return voters;
     }
 
@@ -149,18 +157,82 @@ class Poll {
 
 class Manager {
 
-    private final List<User> usersList;
-    private final List<Poll> polls;
-    private final HashMap<User, Poll> adminPerPoll;
+    private  List<User> usersList;
+    private  List<Poll> polls;
+
     private static final Scanner scanner = new Scanner(System.in);
 
 
     public Manager() {
-        usersList = new ArrayList<>();
-        polls = new ArrayList<>();
-        adminPerPoll = new HashMap<>();
+         importUsers();
+        importPolls();
+
     }
     //helper methods
+
+    public void importUsers(){
+          File file=new File("src/users.ser");
+          if(!file.exists()||file.length()==0){
+              usersList=new ArrayList<>();
+              return;
+          }
+           try{
+               ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
+               usersList=(List<User>)inputStream.readObject();
+               inputStream.close();
+           }catch(IOException e){
+                System.exit(1);
+        }
+           catch (ClassNotFoundException e){
+               System.exit(3);
+           }
+    }
+
+    public void exportUsers(){
+        File file=new File("src/users.ser");
+
+        try{
+            ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
+            outputStream.writeObject(usersList);
+            outputStream.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public  void  importPolls(){
+
+        File file=new File("src/polls.ser");
+        if(!file.exists()||file.length()==0){
+            polls=new ArrayList<>();
+            return;
+        }
+        try{
+            ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
+            polls=(List<Poll>)inputStream.readObject();
+            inputStream.close();
+        }catch(IOException e){
+            System.exit(1);
+        }
+        catch (ClassNotFoundException e){
+            System.exit(3);
+        }
+    }
+
+    public  void exportPolls(){
+          File file=new File("src/polls.ser");
+
+            try{
+                ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
+                outputStream.writeObject(polls);
+                outputStream.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+    }
+
+
+
 
     public String getUserName() {
         System.out.println("Enter user name : ");
@@ -174,7 +246,7 @@ class Manager {
     }
 
     public boolean isUserNameTaken(String name) {
-
+        importUsers();
         for (User user : usersList) {
             if (user.getUsername().equals(name))
                 return true;
@@ -184,7 +256,7 @@ class Manager {
     }
 
     public User findUserByName(String name) {
-
+          importUsers();
         for (User user : usersList) {
             if (user.getUsername().equals(name))
                 return user;
@@ -193,7 +265,7 @@ class Manager {
     }
 
     public boolean isValidUser(String name, String password) {
-
+         importUsers();
         for (User user : usersList) {
             if (user.getPassword().equals(password) && user.getUsername().equals(name))
                 return true;
@@ -202,6 +274,7 @@ class Manager {
     }
 
     public List<Poll> getActivePolls() {
+        importPolls();
         List<Poll> activePolls = new ArrayList<>();
         for (Poll poll : polls) {
             if (poll.getStatus().equals("active"))
@@ -212,12 +285,14 @@ class Manager {
     }
 
     public void viewAllPolls(){
+        importPolls();
         viewPolls(polls);
     }
 
 
 
     public void viewPolls(List<Poll> pollList) {
+
         if (pollList.isEmpty())
             return;
         for (int i = 0; i < pollList.size(); i++) {
@@ -230,19 +305,24 @@ class Manager {
     public void viewChoices(Poll poll) {
         if (poll.getVotePerChoice().isEmpty())
             return;
+        System.out.println("     "+poll.getVoters().size()+" votes");
         int i = 0;
         for (String key : poll.getVotePerChoice().keySet()) {
-
-            System.out.println((++i) + " " + key + "(" + ((double) poll.getVotePerChoice().get(key) / poll.getVoters().size()) * 100 + "% )");
+            if(poll.getVoters().isEmpty()){
+                System.out.println((++i) + " " + key + "( 0 votes ) " );
+            }
+            else {
+                System.out.println((++i) + " " + key + "(" + ((double) poll.getVotePerChoice().get(key) / poll.getVoters().size()) * 100 + "% )");
+            }
         }
     }
 
-    public Poll pickPoll(String message, List<Poll> polls) {
+    public Poll pickPoll(String message, List<Poll> polls1) {
         System.out.println(message);
 
         int choice = Integer.parseInt(scanner.nextLine());
 
-        return polls.get(choice - 1);
+        return polls1.get(choice - 1);
 
     }
 
@@ -262,35 +342,10 @@ class Manager {
         return key;
     }
 
-    public User getUser(){
-        String name;             //only users can create poll
-        String password;
-        User user=null;
-        int choice=1;
-        do {
-            name = getUserName();
-            password = getPassword();
-            if (isValidUser(name, password)) {
-                break;
-            }
-            else{
-                System.out.println("user not found,would you like to\n1 try again\n2 register as a new user\n3 return to menu");
-                choice=Integer.parseInt(scanner.nextLine());
 
-            }
-        }while (choice==1);
-        if(choice==2){
 
-            return registerUser();
-        }
-        if(choice==3)
-            return null;
 
-        else{
-            return findUserByName(name);
-        }
 
-    }
 
 
 //main functionalities
@@ -317,20 +372,21 @@ class Manager {
             }
             if (password.length() < 6)
                 System.out.println("password should contain at least 6 characters,try again");
-            else
+            else if(digitCount<3)
                 System.out.println("password should contain at least  3 digits.try again ");
 
         } while (password.length() < 6 || digitCount < 3);
 
         User user = new User(name,password);
        usersList.add(user);
+       exportUsers();
       System.out.println("you have successfully registered as "+user.getUsername()+" and your password is "+user.getPassword());
       return  user;
 }
 
 
-public void createPoll(){
-            User user=getUser();
+public void createPoll(User user){
+
             if(user==null){
                 return;
             }
@@ -340,7 +396,8 @@ public void createPoll(){
             String topic =scanner.nextLine();
             Poll poll=new Poll(topic);
             polls.add(poll);
-            adminPerPoll.put(user,poll);
+            user.getUserCreatedPolls().add(poll);
+
 
 
             System.out.println("enter  choices one by one and enter 1 when you finish: ");
@@ -358,34 +415,49 @@ public void createPoll(){
                     i++;
                   }
             }
+            System.out.println("poll successfully created.\n"+"     "+topic);
+            exportPolls();
+            exportUsers();        //b/c user userCreatedPoll list  is updated
+           viewChoices(poll);
   }
 
 
 
-   public void   vote(){
-          User voter=getUser();
+   public void   vote(User voter){
+
           if(voter==null){
               return;
           }
-          System.out.println("here are a list of currently active polls: ");
-
           List<Poll> activePolls=getActivePolls();
-          viewPolls(activePolls);
+
+          if(activePolls.isEmpty()){
+              System.out.println("There are no active polls for now. ");
+              return;
+          }
+          System.out.println("here are a list of currently active polls: ");
+          viewPolls(getActivePolls());
 
        Poll poll=pickPoll("enter the number of poll you want to vote : ", activePolls);
+       for(User user:poll.getVoters()){
+           if(user.getUsername().equals(voter.getUsername())){
+               System.out.println("you already voted.");
+               return;
+           }
 
-      if(poll.getVoters().contains(voter)){
-          System.out.println("you already voted.");
-          return;
-      }
-         String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
+       }
+
+       String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
 
       poll.getVotePerChoice().put(key,poll.getVotePerChoice().get(key)+1);
+      poll.getVoters().add(voter);
+      exportPolls();
+      System.out.println("☑ "+key+"\n");
+      viewChoices(poll);
 
    }
 
-    public void removePoll(){
-         User admin=getUser();
+    public void closePoll(User admin){
+
          if(admin==null)
              return;
 
@@ -395,15 +467,37 @@ public void createPoll(){
              System.out.println("poll not found.");
              return;
          }
-         if(adminPerPoll.get(admin)==null||!adminPerPoll.get(admin).equals(poll)){
+         if(!admin.getUserCreatedPolls().contains(poll)){
                System.out.println("you are not admin for the poll.");
                return;
          }
-         poll.setStatus("inactive");
+          poll.setStatus("inactive");
+          exportPolls();
+          exportUsers();   // b/c user userCreatedPolls  list is changed
+          System.out.println(" poll successfully closed.");
+          showResult(poll);
 
     }
 
+   public  void showResult(Poll poll){
+        if(poll.getVotePerChoice().isEmpty()){
+            return;                   //poll closed without vote have no result .
+        }
+        viewChoices(poll);
+       int  winnerVotes=0;
+       String winnerOpinion="null";
+        for(String key:poll.getVotePerChoice().keySet()){
+            if(poll.getVotePerChoice().get(key)>winnerVotes){
+                winnerVotes=poll.getVotePerChoice().get(key);
+                winnerOpinion=key;
+            }
+        }
 
+        System.out.println("\n\n       most popular opinion:   \" "+winnerOpinion+"\"   with "+winnerVotes +" votes.\n");
+
+
+
+   }
 
 
 
