@@ -30,8 +30,8 @@ class Menu{
         } else if (choice == 2) {
             String name = manager.getUserName();
             String password = manager.getPassword();
-            manager.isValidUser(name, password);
             user = manager.findUserByName(name);
+
         } else {
             return;
         }
@@ -263,16 +263,6 @@ class Manager {
         }
         return null;
     }
-
-    public boolean isValidUser(String name, String password) {
-         importUsers();
-        for (User user : usersList) {
-            if (user.getPassword().equals(password) && user.getUsername().equals(name))
-                return true;
-        }
-        return false;
-    }
-
     public List<Poll> getActivePolls() {
         importPolls();
         List<Poll> activePolls = new ArrayList<>();
