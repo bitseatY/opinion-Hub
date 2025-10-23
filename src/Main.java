@@ -120,14 +120,15 @@ class User implements Serializable{
 
 class Poll  implements Serializable{
     private  final String topic;
-    private  String status;
+    public   enum  status{ACTIVE,EXPIRED};
+    private status currentStatus;
     private final  LocalDateTime creationDateTime;
     private  final LocalDateTime expiryDateTime;
     private final  HashMap<String, Integer> votePerChoice;
     private  final List<User> voters;
 
     public Poll(String topic, Duration duration) {
-        status="active";          //poll is active when created
+       currentStatus=status.ACTIVE ;          //poll is active when created
         this.topic = topic;
         voters=new ArrayList<>();
         votePerChoice = new HashMap<>();
@@ -135,17 +136,19 @@ class Poll  implements Serializable{
         expiryDateTime=creationDateTime.plus(duration);
     }
 
-    public  synchronized void  setStatus(String status) {
-        this.status = status;
+    public  synchronized void  setStatus() {
+         if(currentStatus==status.ACTIVE)
+             currentStatus=status.EXPIRED;
+
     }
 
     public LocalDateTime getExpiryDateTime() {
         return expiryDateTime;
     }
 
-    public   synchronized String getStatus() {
+    public   synchronized status getStatus() {
 
-        return status;
+        return currentStatus;
     }
 
     public String getTopic() {
@@ -279,7 +282,7 @@ class Manager {
         importPolls();
         List<Poll> activePolls = new ArrayList<>();
         for (Poll poll : polls) {
-            if (poll.getStatus().equals("active"))
+            if (poll.getStatus()== Poll.status.ACTIVE)
                 activePolls.add(poll);
 
 
@@ -293,8 +296,6 @@ class Manager {
         viewPolls(polls);
     }
 
-
-
     public void viewPolls(List<Poll> pollList) {
 
         if (pollList.isEmpty())
@@ -305,6 +306,17 @@ class Manager {
         }
 
     }
+    public void viewTop5polls(){
+
+
+
+
+    }
+
+
+
+
+
 
     public void viewChoices(Poll poll) {
         if (poll.getVotePerChoice().isEmpty())
@@ -427,7 +439,7 @@ public synchronized  void createPoll(User user){
                     throw new RuntimeException(e);
                 }
 
-                poll.setStatus("inactive");
+                poll.setStatus();
                 exportPolls();
             }).start();
 
@@ -485,7 +497,7 @@ public synchronized  void createPoll(User user){
 
        String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
        if(LocalDateTime.now().isAfter(poll.getExpiryDateTime())){
-           poll.setStatus("inactive");
+           poll.setStatus();
            exportPolls();
            System.out.println("poll has expired.");
            return;
@@ -515,7 +527,7 @@ public synchronized  void createPoll(User user){
                System.out.println("you are not admin for the poll.");
                return;
          }
-          poll.setStatus("inactive");
+          poll.setStatus();
           exportPolls();
           exportUsers();   // b/c user userCreatedPolls  list is changed
           System.out.println(" poll successfully closed.");
