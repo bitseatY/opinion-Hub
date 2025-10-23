@@ -1,5 +1,8 @@
 import java.io.*;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +49,7 @@ class Menu{
                            4.view all poles
                            5.exit
                     
-                    
+                  
                     """);
 
             choice = Integer.parseInt(scanner.nextLine());
@@ -84,7 +87,7 @@ class Menu{
 class User implements Serializable{
      private String Username;
      private String password;
-     private List<Poll> userCreatedPolls;
+     private final List<Poll> userCreatedPolls;
      public User(String username,String password){
          this.password=password; this.Username=username;
          userCreatedPolls=new ArrayList<>();
@@ -118,21 +121,30 @@ class User implements Serializable{
 class Poll  implements Serializable{
     private  final String topic;
     private  String status;
+    private final  LocalDateTime creationDateTime;
+    private  final LocalDateTime expiryDateTime;
     private final  HashMap<String, Integer> votePerChoice;
     private  final List<User> voters;
 
-    public Poll(String topic) {
-        status="active";                     //poll is active when created
+    public Poll(String topic, Duration duration) {
+        status="active";          //poll is active when created
         this.topic = topic;
         voters=new ArrayList<>();
         votePerChoice = new HashMap<>();
+         creationDateTime=LocalDateTime.now();
+        expiryDateTime=creationDateTime.plus(duration);
     }
 
-    public void setStatus(String status) {
+    public  synchronized void  setStatus(String status) {
         this.status = status;
     }
 
-    public String getStatus() {
+    public LocalDateTime getExpiryDateTime() {
+        return expiryDateTime;
+    }
+
+    public   synchronized String getStatus() {
+
         return status;
     }
 
@@ -263,12 +275,14 @@ class Manager {
         }
         return null;
     }
-    public List<Poll> getActivePolls() {
+    public  List<Poll> getActivePolls() {
         importPolls();
         List<Poll> activePolls = new ArrayList<>();
         for (Poll poll : polls) {
             if (poll.getStatus().equals("active"))
                 activePolls.add(poll);
+
+
         }
 
         return activePolls;
@@ -375,16 +389,48 @@ class Manager {
 }
 
 
-public void createPoll(User user){
+public synchronized  void createPoll(User user){
 
             if(user==null){
                 return;
             }
 
 
-             System.out.println("Enter the topic for the poll: ");
-            String topic =scanner.nextLine();
-            Poll poll=new Poll(topic);
+    String topic = null;
+    int days= 0;
+    int  hours= 0;
+    int minutes= 0;
+    while (true) {
+        try {
+            System.out.println("Enter the topic for the poll: ");
+            topic = scanner.nextLine();
+            System.out.println("How long will the poll last? (duration can't be more than 10 days.):  ");
+            System.out.println("how many days? (only digit) ");
+            days = Integer.parseInt(scanner.nextLine());
+            System.out.println(days + "days + how many hours? (only digit) ");
+            hours = Integer.parseInt(scanner.nextLine());
+            System.out.println(days+" days + "+hours+" hours how many minutes? (only digit) ");
+            minutes = Integer.parseInt(scanner.nextLine());
+            System.out.println("poll will last  "+days+"days and "+hours+" hours and "+minutes+" minutes.");
+            break;
+        } catch (NumberFormatException e) {
+            System.out.println("in valid answer ,try again.\n");
+        }
+    }
+            Duration duration=Duration.ofDays(days).plusHours(hours).plusMinutes(minutes);
+
+            Poll poll=new Poll(topic,duration);              //every poll will have a timer that automatically close it when expiry date is reached.
+            new Thread(() ->{
+                try {
+                    Thread.sleep(duration.toMillis());
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
+                poll.setStatus("inactive");
+                exportPolls();
+            }).start();
+
             polls.add(poll);
             user.getUserCreatedPolls().add(poll);
 
@@ -405,7 +451,7 @@ public void createPoll(User user){
                     i++;
                   }
             }
-            System.out.println("poll successfully created.\n"+"     "+topic);
+            System.out.println("poll  created , expires at "+ poll.getExpiryDateTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy  HH:mm:ss")));
             exportPolls();
             exportUsers();        //b/c user userCreatedPoll list  is updated
            viewChoices(poll);
@@ -413,7 +459,7 @@ public void createPoll(User user){
 
 
 
-   public void   vote(User voter){
+   public synchronized  void   vote(User voter){
 
           if(voter==null){
               return;
@@ -425,9 +471,10 @@ public void createPoll(User user){
               return;
           }
           System.out.println("here are a list of currently active polls: ");
-          viewPolls(getActivePolls());
+          viewPolls(activePolls);
 
        Poll poll=pickPoll("enter the number of poll you want to vote : ", activePolls);
+
        for(User user:poll.getVoters()){
            if(user.getUsername().equals(voter.getUsername())){
                System.out.println("you already voted.");
@@ -437,8 +484,15 @@ public void createPoll(User user){
        }
 
        String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
+       if(LocalDateTime.now().isAfter(poll.getExpiryDateTime())){
+           poll.setStatus("inactive");
+           exportPolls();
+           System.out.println("poll has expired.");
+           return;
+       }
 
-      poll.getVotePerChoice().put(key,poll.getVotePerChoice().get(key)+1);
+
+       poll.getVotePerChoice().put(key,poll.getVotePerChoice().get(key)+1);
       poll.getVoters().add(voter);
       exportPolls();
       System.out.println("☑ "+key+"\n");
@@ -446,7 +500,7 @@ public void createPoll(User user){
 
    }
 
-    public void closePoll(User admin){
+    public  synchronized  void closePoll(User admin){
 
          if(admin==null)
              return;
