@@ -82,24 +82,15 @@ public class Manager {
             throw new RuntimeException(e);
         }
     }
-    public String getUserName() {
+    public String getInfo(String message){
         System.out.println("Enter user name : ");
-        return scanner.nextLine();
-
-    }
-
-    public String getPassword() {
-        System.out.println("Enter password: ");
         return scanner.nextLine();
     }
 
     public boolean isUserNameTaken(String name) {
-        importUsers();
-        for (User user : usersList) {
-            if (user.getUsername().equals(name))
-                return true;
-        }
-        return false;}
+        return findUserByName(name)!=null;
+    }
+
     public User findUserByName(String name) {
         importUsers();
         for (User user : usersList) {
@@ -108,6 +99,13 @@ public class Manager {
         }
         return null;
     }
+
+    public boolean isValid(String name,String password){
+         User user=findUserByName(name);
+          return  (user!=null&&user.getPassword().equals(password));
+
+    }
+
     public  List<Poll> getActivePolls() {
         importPolls();
         List<Poll> activePolls = new ArrayList<>();
@@ -136,9 +134,11 @@ public class Manager {
         }
 
     }
+
     public void viewChoices(Poll poll) {
         if (poll.getVotePerChoice().isEmpty())
             return;
+
         System.out.println("     "+poll.getVoters().size()+" votes");
         int i = 0;
         for (String key : poll.getVotePerChoice().keySet()) {
@@ -151,12 +151,12 @@ public class Manager {
         }
     }
 
-    public Poll pickPoll(String message, List<Poll> polls1) {
+    public Poll pickPoll(String message, List<Poll> pollslist) {
         System.out.println(message);
 
         int choice = Integer.parseInt(scanner.nextLine());
 
-        return polls1.get(choice - 1);
+        return pollslist.get(choice - 1);
 
     }
 
@@ -180,19 +180,19 @@ public class Manager {
 
     public User registerUser() {
         //get valid username
-        String name = getUserName();
+        String name = getInfo("enter user name: ");
         while (isUserNameTaken(name) || name.length() < 6) {
             if (name.length() < 6)
                 System.out.println("user name length should be greater than 6 characters,try another.");
             else
                 System.out.println("user name is taken,try another.");
-            name = getUserName();
+            name = getInfo("enter user name: ");
         }
         //get valid password
         String password ;
         int digitCount;
         do {
-            password = getPassword();
+            password = getInfo("enter password: ");
             digitCount = 0;
             for (char c : password.toCharArray()) {
                 if (Character.isDigit(c))
@@ -338,6 +338,45 @@ public class Manager {
         showResult(poll);
 
     }
+    public void mostVotedActivePolls(){
+         Poll[] topPolls=new Poll[5];
+         int entries=0;     // how many polls are on topPolls
+         List<Poll> activePolls=getActivePolls();
+         for(Poll poll:activePolls){
+             while (entries< topPolls.length||poll.getVoters().size()>topPolls[topPolls.length-1].getVoters().size()){
+                   if(entries< topPolls.length){
+                       entries++;
+                   }
+                   int j=entries-1;
+                   while (j>0&&topPolls[j-1].getVoters().size()<poll.getVoters().size()){
+                        topPolls[j]=topPolls[j-1];
+                        j--;
+                   }
+                   topPolls[j]=poll;
+
+
+
+
+
+             }
+
+
+
+
+         }
+
+
+
+
+
+    }
+
+
+
+
+
+
+
     public  void showResult(Poll poll){
         if(poll.getVotePerChoice().isEmpty()){
             return;                   //poll closed without vote have no result .
