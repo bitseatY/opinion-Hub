@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Scanner;
 
 public class Manager {
-    private List<User> usersList;
+    private  List<User> usersList;
     private  List<Poll> polls;
 
     private static final Scanner scanner = new Scanner(System.in);
@@ -386,22 +386,21 @@ public class Manager {
 
        }
     }
-    public List<Poll> mostVotedActivePolls(){
+    public List<Poll>  top5MostVotedActivePolls(){
          Poll[] topPolls=new Poll[5];
          int entries=0;     // how many polls are on topPolls
          List<Poll> activePolls=getActivePolls();
          if(activePolls.isEmpty()){
-             System.out.println("no active polls yet");
              return null;
          }
          for(Poll poll:activePolls){
-             while (entries< topPolls.length||poll.getVoters().size()>topPolls[topPolls.length-1].getVoters().size()){
-                   if(entries< topPolls.length){
+            if(entries< 5||poll.getVoters().size()>topPolls[4].getVoters().size()){
+                   if(entries< 5){
                        entries++;
                    }
                    int j=entries-1;
                    while (j>0&&topPolls[j-1].getVoters().size()<poll.getVoters().size()){
-                        topPolls[j]=topPolls[j-1];
+                        topPolls[j-1]=topPolls[j];
                         j--;
                    }
                    topPolls[j]=poll;
@@ -411,17 +410,72 @@ public class Manager {
 
 
              }
+         }
+         return Arrays.asList(topPolls);
 
-
-
-
+    }
+     public List<User>  top5MostActiveUsers(){
+        User[] mostActiveUsers=new User[5];
+         int entries=0;
+         if(usersList.isEmpty()){
+             return null;
          }
 
 
-     return Arrays.asList(topPolls);
 
+
+         for(User user:usersList){
+
+             if (entries< 5||user.getUserVotedPolls().size()>mostActiveUsers[4].getUserVotedPolls().size()){
+                 if(entries< 5){
+                     entries++;
+                 }
+                 int j=entries-1;
+                 while (j>0&&mostActiveUsers[j-1].getUserVotedPolls().size()<user.getUserVotedPolls().size()){
+                     mostActiveUsers[j-1]=mostActiveUsers[j];
+                     j--;
+                 }
+                 mostActiveUsers[j]=user;
+
+
+
+
+
+           }
+         }
+
+         return Arrays.asList(mostActiveUsers);
 
     }
+
+
+    public void Dashboard(){
+        System.out.println("\nwhat is trending on Opinion Hub?    \n");
+        List<Poll> pollList=top5MostVotedActivePolls();
+        if(pollList!=null&&!pollList.contains(null)){
+
+            System.out.println("\nhere are the top 5 most voted active  polls on Opinion Hub right now , vote for your opinion now. \n");
+            viewPolls(pollList);
+        }
+        List<User> usersList1=top5MostActiveUsers();
+        if(usersList1!=null&&!usersList1.contains(null)){
+
+            System.out.println("\nhere are the top 5 most active users  on Opinion Hub right now, you can be one of them.\n ");
+            int i=1;
+            for(User user:usersList1){
+                System.out.println((i++)+". "+user.getUsername()+" with "+user.getUserVotedPolls().size()+" votes.");
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
 
     public void seeResultOfClosedPolls(){
         List<Poll> pollList=getClosedPolls();

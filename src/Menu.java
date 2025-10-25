@@ -33,14 +33,16 @@ public class Menu {
         while (true) {
             System.out.println("""
                     what would you like to do:
-                           1.create a poll
-                           2.vote on active polls
-                           3.close a poll(admin only)
-                           4.view all poles
-                           5.see user profile
-                           6.see top polls
-                           7.show result for poll
+                           1.see what's trending
+                           2.see profile
+                           3.vote on active poll
+                           4.create a poll
+                           5.close a poll(admin only)
+                           6.see result of a poll
+                           7.exit
                     
+                    
+                
                     
                     """);
 
@@ -49,27 +51,27 @@ public class Menu {
             choice = Integer.parseInt(scanner.nextLine());
             switch (choice) {
                 case 1:
-                    manager.createPoll(user);
-                    break;
+                     manager.Dashboard();
+                     break;
                 case 2:
+                   manager.seeProfile(user);
+                   break;
+                case 3:
                     manager.vote(user);
                     break;
-                case 3:
-                    manager.closePoll(user);
-                    break;
                 case 4:
-                    manager.viewAllPolls();
+                    manager.createPoll(user);
                     break;
                 case 5:
-                    manager.seeProfile(user);
+                    manager.closePoll(user);
                     break;
 
                 case 6:
-                    manager.viewPolls(manager.mostVotedActivePolls());
-                    break;
-                case 7:
                     manager.seeResultOfClosedPolls();
                     break;
+                case 7:
+
+                     return;
             }
 
 
