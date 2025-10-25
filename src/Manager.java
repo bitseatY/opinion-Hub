@@ -177,6 +177,39 @@ public class Manager {
     }
 
     //main functionalities
+    public  void seeProfile(User user){
+         System.out.println(user.getUsername()+" \nmost recent voted polls : ");
+         for(int i=0;i<10;i++){
+             Poll poll=user.getUserVotedPolls().get(i);
+             if(poll!=null)
+                  System.out.println("        "+poll.getTopic()+"["+(poll.getStatus()== Poll.status.ACTIVE?"Active":"Closed")+"]");
+         }
+
+          System.out.println(user.getUsername()+" \nmost recent created  polls : ");
+         for(int i=0;i<10;i++){
+            Poll poll=user.getUserCreatedPolls().get(i);
+            if(poll!=null)
+                System.out.println("        "+poll.getTopic()+"["+(poll.getStatus()== Poll.status.ACTIVE?"Active":"Closed")+"]");
+         }
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public User registerUser() {
         //get valid username
@@ -307,10 +340,11 @@ public class Manager {
             System.out.println("poll has expired.");
             return;
         }
-
+        voter.getUserVotedPolls().add(poll);
         poll.getVotePerChoice().put(key,poll.getVotePerChoice().get(key)+1);
         poll.getVoters().add(voter);
         exportPolls();
+        exportUsers();
         System.out.println("☑ "+key+"\n");
         viewChoices(poll);
 
@@ -333,7 +367,7 @@ public class Manager {
         }
         poll.setStatus();
         exportPolls();
-        exportUsers();   // b/c user userCreatedPolls  list is changed
+        exportUsers();      // b/c poll status inside user userCreatedPolls  list is changed
         System.out.println(" poll successfully closed.");
         showResult(poll);
 
