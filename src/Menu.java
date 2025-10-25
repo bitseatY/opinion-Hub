@@ -15,9 +15,16 @@ public class Menu {
         if (choice == 1) {
             user = manager.registerUser();
         } else if (choice == 2) {
-            String name = manager.getUserName();
-            String password = manager.getPassword();
-            user = manager.findUserByName(name);
+
+            do {
+                String name = manager.getInfo("enter user name: ");
+                String password = manager.getInfo("enter password: ");
+                if(manager.isValid(name,password)){
+                    user=manager.findUserByName(name);
+                    break;
+                }
+                System.out.println("user name or password is incorrect ,try again. ");
+            }while (true);
 
         } else {
             return;
@@ -28,30 +35,15 @@ public class Menu {
                     what would you like to do:
                            1.create a poll
                            2.vote on active polls
-                           3.remove a poll(admin only)
+                           3.close a poll(admin only)
                            4.view all poles
-                           5.exit
+                           5.see user profile
+                           6.see top polls
+                           7.show result for poll
                     
                     
                     """);
-            choice = Integer.parseInt(scanner.nextLine());
-            switch (choice) {
-                case 1:
-                    manager.createPoll(user);
-                    break;
-                case 2:
-                    manager.vote(user);
-                    break;
-                case 3:
-                    manager.closePoll(user);
-                    break;
-                case 4:
-                    manager.viewAllPolls();
-                    break;
-                case 5:
-                    return;
 
-            }
 
 
             choice = Integer.parseInt(scanner.nextLine());
@@ -69,8 +61,15 @@ public class Menu {
                     manager.viewAllPolls();
                     break;
                 case 5:
-                    return;
+                    manager.seeProfile(user);
+                    break;
 
+                case 6:
+                    manager.viewPolls(manager.mostVotedActivePolls());
+                    break;
+                case 7:
+                    manager.seeResultOfClosedPolls();
+                    break;
             }
 
 

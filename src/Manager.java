@@ -3,6 +3,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -83,7 +84,7 @@ public class Manager {
         }
     }
     public String getInfo(String message){
-        System.out.println("Enter user name : ");
+        System.out.println(message);
         return scanner.nextLine();
     }
 
@@ -118,15 +119,31 @@ public class Manager {
 
         return activePolls;
     }
+    public List<Poll> getClosedPolls(){
+        importPolls();
+        List<Poll> closedPolls = new ArrayList<>();
+        for (Poll poll : polls) {
+            if (poll.getStatus()== Poll.status.EXPIRED)
+                closedPolls.add(poll);
+
+
+        }
+        return closedPolls;
+    }
+
 
     public void viewAllPolls(){
         importPolls();
+        if(polls.isEmpty()){
+            System.out.println("no polls are created yet.");
+            return;
+        }
         viewPolls(polls);
     }
 
     public void viewPolls(List<Poll> pollList) {
 
-        if (pollList.isEmpty())
+        if (pollList==null||pollList.isEmpty())
             return;
         for (int i = 0; i < pollList.size(); i++) {
             System.out.println((i + 1) + " " + pollList.get(i).getTopic() + "(" + pollList.get(i).getVoters().size() + " participants)" +
@@ -178,36 +195,28 @@ public class Manager {
 
     //main functionalities
     public  void seeProfile(User user){
-         System.out.println(user.getUsername()+" \nmost recent voted polls : ");
-         for(int i=0;i<10;i++){
-             Poll poll=user.getUserVotedPolls().get(i);
-             if(poll!=null)
-                  System.out.println("        "+poll.getTopic()+"["+(poll.getStatus()== Poll.status.ACTIVE?"Active":"Closed")+"]");
-         }
+         if(user.getUserVotedPolls().isEmpty()){
+             System.out.println("you haven't voted to any polls yet.");
+         }else {
+             System.out.println(user.getUsername() + " \nmost recent voted polls : ");
 
-          System.out.println(user.getUsername()+" \nmost recent created  polls : ");
-         for(int i=0;i<10;i++){
-            Poll poll=user.getUserCreatedPolls().get(i);
-            if(poll!=null)
-                System.out.println("        "+poll.getTopic()+"["+(poll.getStatus()== Poll.status.ACTIVE?"Active":"Closed")+"]");
-         }
+             for (int i = 0; i < user.getUserVotedPolls().size() - 1 && i < 10; i++) {
+                 Poll poll = user.getUserVotedPolls().get(i);
+                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus() == Poll.status.ACTIVE ? "Active" : "Closed") + "]");
 
+             }
+         }
+         if(user.getUserCreatedPolls().isEmpty()){
+             System.out.println("you haven't created any polls yet.");
+         }
+         else {
+             System.out.println(user.getUsername() + " \nmost recent created  polls : ");
+             for (int i = 0; i < user.getUserVotedPolls().size() - 1 && i < 10; i++) {
+                 Poll poll = user.getUserCreatedPolls().get(i);
+                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus() == Poll.status.ACTIVE ? "Active" : "Closed") + "]");
+             }
+         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -351,31 +360,40 @@ public class Manager {
     }
 
     public  synchronized  void closePoll(User admin){
+         importUsers();
+
 
         if(admin==null)
             return;
-
-        viewPolls(getActivePolls());
-        Poll poll=pickPoll("choose poll you want to remove(only if you are admin of the poll): ",getActivePolls());
-        if(poll==null){
-            System.out.println("poll not found.");
-            return;
+        List<Poll> pollList=getActivePolls();
+        if(pollList.isEmpty()){
+            System.out.println("no active poll present to close. ");
+              return;
         }
-        if(!admin.getUserCreatedPolls().contains(poll)){
-            System.out.println("you are not admin for the poll.");
-            return;
-        }
-        poll.setStatus();
-        exportPolls();
-        exportUsers();      // b/c poll status inside user userCreatedPolls  list is changed
-        System.out.println(" poll successfully closed.");
-        showResult(poll);
+        viewPolls(pollList);
+        Poll poll=pickPoll("choose poll you want to remove(only if you are admin of the poll): ",pollList);
+       for(Poll poll1: admin.getUserCreatedPolls()){
+           if(poll1.getTopic().equals(poll.getTopic())){
+               poll.setStatus();
+               exportPolls();
+               exportUsers();      // b/c poll status inside user userCreatedPolls  list is changed
+               System.out.println(" poll successfully closed.");
+               showResult(poll);
 
+
+           }
+
+
+       }
     }
-    public void mostVotedActivePolls(){
+    public List<Poll> mostVotedActivePolls(){
          Poll[] topPolls=new Poll[5];
          int entries=0;     // how many polls are on topPolls
          List<Poll> activePolls=getActivePolls();
+         if(activePolls.isEmpty()){
+             System.out.println("no active polls yet");
+             return null;
+         }
          for(Poll poll:activePolls){
              while (entries< topPolls.length||poll.getVoters().size()>topPolls[topPolls.length-1].getVoters().size()){
                    if(entries< topPolls.length){
@@ -400,8 +418,21 @@ public class Manager {
          }
 
 
+     return Arrays.asList(topPolls);
 
 
+    }
+
+    public void seeResultOfClosedPolls(){
+        List<Poll> pollList=getClosedPolls();
+        if(pollList.isEmpty()){
+            System.out.println("no closed polls yet.");
+            return;
+        }
+        System.out.println("Here are a list of closed polls: ");
+        viewPolls(pollList);
+        Poll poll=pickPoll("Here are a list of closed polls: ",pollList);
+        showResult(poll);
 
     }
 
