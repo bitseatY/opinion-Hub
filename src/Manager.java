@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Scanner;
 
 public class Manager {
-    private  List<User> usersList;
-    private  List<Poll> polls;
+    private  List<User> userList;
+    private  List<Poll> pollList;
 
     private static final Scanner scanner = new Scanner(System.in);
 
@@ -20,15 +20,16 @@ public class Manager {
 
     }
     //helper methods
-    public void importUsers(){
+
+    public void importUsers(){                      // every time we access usersList, we have to make sure we get the updated version of the list from the database
         File file=new File("src/database/users.ser");
         if(!file.exists()||file.length()==0){
-            usersList=new ArrayList<>();
+            userList =new ArrayList<>();
             return;
         }
         try{
             ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
-            usersList=(List<User>)inputStream.readObject();
+            userList =(List<User>)inputStream.readObject();
             inputStream.close();
         }catch(IOException e){
             System.exit(1);
@@ -37,33 +38,28 @@ public class Manager {
             System.exit(3);
         }
     }
-    public void exportUsers(){
+    public void exportUsers(){  // everytime we modify userList ,we have to make sure the userList in the database contain the updated version of userList
         File file=new File("src/database/users.ser");
 
         try{
             ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
-            outputStream.writeObject(usersList);
+            outputStream.writeObject(userList);
             outputStream.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-
-
-
-
-
-    public  void  importPolls(){
+    public  void  importPolls(){ //everytime we access pollList, we have to make sure we get the updated version of the list in the database
 
         File file=new File("src/database/polls.ser");
         if(!file.exists()||file.length()==0){
-            polls=new ArrayList<>();
+            pollList =new ArrayList<>();
             return;
         }
         try{
             ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
-            polls=(List<Poll>)inputStream.readObject();
+            pollList =(List<Poll>)inputStream.readObject();
             inputStream.close();
         }catch(IOException e){
             System.exit(1);
@@ -72,57 +68,57 @@ public class Manager {
             System.exit(3);
         }
     }
-    public  void exportPolls(){
+    public  void exportPolls(){ //everytime we modify pollList we have to make sure the database contains the updated version of the list
         File file=new File("src/database/polls.ser");
 
         try{
             ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
-            outputStream.writeObject(polls);
+            outputStream.writeObject(pollList);
             outputStream.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
     public String getInfo(String message){
         System.out.println(message);
         return scanner.nextLine();
     }
 
-    public boolean isUserNameTaken(String name) {
+    public boolean isUserNameTaken(String name) {    //username is unique for every user
+
         return findUserByName(name)!=null;
     }
 
     public User findUserByName(String name) {
         importUsers();
-        for (User user : usersList) {
+        for (User user : userList) {
             if (user.getUsername().equals(name))
                 return user;
         }
         return null;
     }
 
-    public boolean isValid(String name,String password){
+    public boolean isValid(String name,String password){ // password must match user username
          User user=findUserByName(name);
           return  (user!=null&&user.getPassword().equals(password));
 
     }
 
-    public  List<Poll> getActivePolls() {
+    public  List<Poll> getActivePolls() {    //expired polls can't accept votes
         importPolls();
         List<Poll> activePolls = new ArrayList<>();
-        for (Poll poll : polls) {
+        for (Poll poll : pollList) {
             if (poll.getStatus()== Poll.status.ACTIVE)
                 activePolls.add(poll);
-
-
         }
-
         return activePolls;
     }
-    public List<Poll> getClosedPolls(){
+
+    public List<Poll> getClosedPolls(){  //only closed polls have result ,active polls are still in progress
         importPolls();
         List<Poll> closedPolls = new ArrayList<>();
-        for (Poll poll : polls) {
+        for (Poll poll : pollList) {
             if (poll.getStatus()== Poll.status.EXPIRED)
                 closedPolls.add(poll);
 
@@ -134,11 +130,11 @@ public class Manager {
 
     public void viewAllPolls(){
         importPolls();
-        if(polls.isEmpty()){
+        if(pollList.isEmpty()){
             System.out.println("no polls are created yet.");
             return;
         }
-        viewPolls(polls);
+        viewPolls(pollList);
     }
 
     public void viewPolls(List<Poll> pollList) {
@@ -194,6 +190,7 @@ public class Manager {
     }
 
     //main functionalities
+
     public  void seeProfile(User user){
          if(user.getUserVotedPolls().isEmpty()){
              System.out.println("you haven't voted to any polls yet.");
@@ -217,8 +214,6 @@ public class Manager {
              }
          }
     }
-
-
 
     public User registerUser() {
         //get valid username
@@ -248,8 +243,8 @@ public class Manager {
         } while (password.length() < 6 || digitCount < 3);
 
         User user = new User(name,password);
-        usersList.add(user);
-        exportUsers();
+        userList.add(user);
+        exportUsers();            //userList in the database should be modified as well
         System.out.println("you have successfully registered as "+user.getUsername()+" and your password is "+user.getPassword());
         return  user;
     }
@@ -259,8 +254,6 @@ public class Manager {
         if (user == null) {
             return;
         }
-
-
         String topic = null;
         int days = 0;
         int hours = 0;
@@ -296,7 +289,7 @@ public class Manager {
             exportPolls();
         }).start();
 
-        polls.add(poll);
+        pollList.add(poll);
         user.getUserCreatedPolls().add(poll);
         System.out.println("enter  choices one by one and enter 1 when you finish: ");
         int i = 1;
@@ -313,12 +306,14 @@ public class Manager {
             }
         }
         System.out.println("poll  created , expires at " + poll.getExpiryDateTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy  HH:mm:ss")));
-        exportPolls();
-        exportUsers();        //b/c user userCreatedPoll list  is updated
+        exportPolls();         //pollList is updated
+        exportUsers();        //user userCreatedPoll list  is updated
         viewChoices(poll);
     }
 
-    public synchronized  void   vote(User voter){
+    public synchronized  void   vote(User voter){      // vote is Synchronized b/c  we don't want poll timer thread to interrupt in the middle leading to inconsistent state of a poll
+        //but this also prevents multiple users from voting on the same poll at the same time , they have to take turns
+        //future fix, apply concurrency concept
 
         if(voter==null){
             return;
@@ -334,17 +329,18 @@ public class Manager {
 
         Poll poll=pickPoll("enter the number of poll you want to vote : ", activePolls);
 
-        for(User user:poll.getVoters()){
+        for(User user:poll.getVoters()){    //user can't vote multiple times in a single poll
             if(user.getUsername().equals(voter.getUsername())){
                 System.out.println("you already voted.");
                 return;
             }
-
         }
 
         String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
-        if(LocalDateTime.now().isAfter(poll.getExpiryDateTime())){
-            poll.setStatus();
+
+
+        if(LocalDateTime.now().isAfter(poll.getExpiryDateTime())){  // we have to make sure poll expiry time hasn't passed before recording the vote
+            poll.setStatus();       //change poll status to expired
             exportPolls();
             System.out.println("poll has expired.");
             return;
@@ -359,7 +355,7 @@ public class Manager {
 
     }
 
-    public  synchronized  void closePoll(User admin){
+    public  synchronized  void closePoll(User admin){// same issue as vote method
          importUsers();
 
 
@@ -379,16 +375,12 @@ public class Manager {
                exportUsers();      // b/c poll status inside user userCreatedPolls  list is changed
                System.out.println(" poll successfully closed.");
                showResult(poll);
-
-
            }
-
-
        }
     }
-    public List<Poll>  top5MostVotedActivePolls(){
+    public List<Poll>  top5MostVotedActivePolls(){  //uses insertion sort for ordering polls in decreasing order in the array
          Poll[] topPolls=new Poll[5];
-         int entries=0;     // how many polls are on topPolls
+         int entries=0;     // how many polls are there  on topPolls currently
          List<Poll> activePolls=getActivePolls();
          if(activePolls.isEmpty()){
              return null;
@@ -404,27 +396,19 @@ public class Manager {
                         j--;
                    }
                    topPolls[j]=poll;
-
-
-
-
-
-             }
+            }
          }
          return Arrays.asList(topPolls);
-
     }
+
      public List<User>  top5MostActiveUsers(){
         User[] mostActiveUsers=new User[5];
          int entries=0;
-         if(usersList.isEmpty()){
+         if(userList.isEmpty()){
              return null;
          }
 
-
-
-
-         for(User user:usersList){
+         for(User user: userList){
 
              if (entries< 5||user.getUserVotedPolls().size()>mostActiveUsers[4].getUserVotedPolls().size()){
                  if(entries< 5){
@@ -436,18 +420,10 @@ public class Manager {
                      j--;
                  }
                  mostActiveUsers[j]=user;
-
-
-
-
-
-           }
+             }
          }
-
          return Arrays.asList(mostActiveUsers);
-
     }
-
 
     public void Dashboard(){
         System.out.println("\nwhat is trending on Opinion Hub?    \n");
@@ -468,16 +444,7 @@ public class Manager {
         }
     }
 
-
-
-
-
-
-
-
-
-
-    public void seeResultOfClosedPolls(){
+    public void seeResultOfClosedPolls(){ //choosing is much easier than searching by topic plus user may input wrong topic
         List<Poll> pollList=getClosedPolls();
         if(pollList.isEmpty()){
             System.out.println("no closed polls yet.");
@@ -489,12 +456,6 @@ public class Manager {
         showResult(poll);
 
     }
-
-
-
-
-
-
 
     public  void showResult(Poll poll){
         if(poll.getVotePerChoice().isEmpty()){
@@ -509,27 +470,6 @@ public class Manager {
                 winnerOpinion=key;
             }
         }
-
         System.out.println("\n\n       most popular opinion:   \" "+winnerOpinion+"\"   with "+winnerVotes +" votes.\n");
-
-
-
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
+}

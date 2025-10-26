@@ -9,7 +9,6 @@ public class Poll implements Serializable {
     private  final String topic;
     public   enum  status{ACTIVE,EXPIRED};
     private status currentStatus;
-    private final LocalDateTime creationDateTime;
     private  final LocalDateTime expiryDateTime;
     private final HashMap<String, Integer> votePerChoice;
     private  final List<User> voters;
@@ -19,8 +18,7 @@ public class Poll implements Serializable {
         this.topic = topic;
         voters=new ArrayList<>();
         votePerChoice = new HashMap<>();
-        creationDateTime=LocalDateTime.now();
-        expiryDateTime=creationDateTime.plus(duration);
+        expiryDateTime=LocalDateTime.now().plus(duration);  // expires at poll created time  plus duration
     }
     public  synchronized void  setStatus() {
         if(currentStatus==status.ACTIVE)
