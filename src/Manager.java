@@ -1,230 +1,164 @@
-import java.io.*;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
+
 import java.util.List;
 import java.util.Scanner;
+import java.sql.*;
 
 public class Manager {
-    private  List<User> userList;
-    private  List<Poll> pollList;
+    private final  DataBaseConnection dataBaseConnection;
+    private  final PollsDao pollsDao;
+    private final UsersDao usersDao;
+    private final ChoicesDao choicesDao;
+    private final VotersDao votersDao;
 
     private static final Scanner scanner = new Scanner(System.in);
 
 
-    public Manager() {
-        importUsers();
-        importPolls();
+    public Manager(DataBaseConnection dataBaseConnection)  {
+        this.dataBaseConnection=dataBaseConnection;
+        pollsDao =new PollsDao(dataBaseConnection.getConnection());
+        usersDao=new UsersDao(dataBaseConnection.getConnection());
+        choicesDao=new ChoicesDao(dataBaseConnection.getConnection());
+        votersDao=new VotersDao(dataBaseConnection.getConnection());
 
     }
     //helper methods
-
-    public void importUsers(){                      // every time we access usersList, we have to make sure we get the updated version of the list from the database
-        File file=new File("src/database/users.ser");
-        if(!file.exists()||file.length()==0){
-            userList =new ArrayList<>();
-            return;
-        }
-        try{
-            ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
-            userList =(List<User>)inputStream.readObject();
-            inputStream.close();
-        }catch(IOException e){
-            System.exit(1);
-        }
-        catch (ClassNotFoundException e){
-            System.exit(3);
-        }
-    }
-    public void exportUsers(){  // everytime we modify userList ,we have to make sure the userList in the database contain the updated version of userList
-        File file=new File("src/database/users.ser");
-
-        try{
-            ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
-            outputStream.writeObject(userList);
-            outputStream.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public  void  importPolls(){ //everytime we access pollList, we have to make sure we get the updated version of the list in the database
-
-        File file=new File("src/database/polls.ser");
-        if(!file.exists()||file.length()==0){
-            pollList =new ArrayList<>();
-            return;
-        }
-        try{
-            ObjectInputStream inputStream=new ObjectInputStream(new FileInputStream(file)) ;
-            pollList =(List<Poll>)inputStream.readObject();
-            inputStream.close();
-        }catch(IOException e){
-            System.exit(1);
-        }
-        catch (ClassNotFoundException e){
-            System.exit(3);
-        }
-    }
-    public  void exportPolls(){ //everytime we modify pollList we have to make sure the database contains the updated version of the list
-        File file=new File("src/database/polls.ser");
-
-        try{
-            ObjectOutputStream outputStream=new ObjectOutputStream(new FileOutputStream(file));
-            outputStream.writeObject(pollList);
-            outputStream.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public String getInfo(String message){
         System.out.println(message);
         return scanner.nextLine();
     }
 
-    public boolean isUserNameTaken(String name) {    //username is unique for every user
-
-        return findUserByName(name)!=null;
+    public boolean isUserNameAvailable(String name)  throws SQLException{    //username is unique for every user
+         return usersDao.isUsernameAvailable(name);
     }
 
-    public User findUserByName(String name) {
-        importUsers();
-        for (User user : userList) {
-            if (user.getUsername().equals(name))
-                return user;
-        }
-        return null;
+    public User findUserByName(String name) throws SQLException {
+        return usersDao.findUserByName(name);
     }
 
-    public boolean isValid(String name,String password){ // password must match user username
-         User user=findUserByName(name);
-          return  (user!=null&&user.getPassword().equals(password));
-
-    }
-
-    public  List<Poll> getActivePolls() {    //expired polls can't accept votes
-        importPolls();
-        List<Poll> activePolls = new ArrayList<>();
-        for (Poll poll : pollList) {
-            if (poll.getStatus()== Poll.status.ACTIVE)
-                activePolls.add(poll);
-        }
-        return activePolls;
-    }
-
-    public List<Poll> getClosedPolls(){  //only closed polls have result ,active polls are still in progress
-        importPolls();
-        List<Poll> closedPolls = new ArrayList<>();
-        for (Poll poll : pollList) {
-            if (poll.getStatus()== Poll.status.EXPIRED)
-                closedPolls.add(poll);
-
-
-        }
-        return closedPolls;
+    public boolean isValid(String name,String password) throws SQLException{   // password must match user username
+        return usersDao.isUserValid(name,password);
     }
 
 
-    public void viewAllPolls(){
-        importPolls();
-        if(pollList.isEmpty()){
-            System.out.println("no polls are created yet.");
-            return;
-        }
-        viewPolls(pollList);
+
+    public List<Poll> getClosedPolls() throws SQLException{   //only closed polls have result ,active polls are still in progress
+        return pollsDao.getClosedPolls();
     }
 
-    public void viewPolls(List<Poll> pollList) {
+    public void viewPolls(List<Poll> pollList) throws SQLException {
 
         if (pollList==null||pollList.isEmpty())
             return;
         for (int i = 0; i < pollList.size(); i++) {
-            System.out.println((i + 1) + " " + pollList.get(i).getTopic() + "(" + pollList.get(i).getVoters().size() + " participants)" +
+            Poll poll=pollList.get(i);
+            System.out.println((i + 1) + " " + poll.getTopic() + "(" + votersDao.getTotalVoters(poll) + " participants)" +
                     "    Status= " + pollList.get(i).getStatus());
         }
 
     }
 
-    public void viewChoices(Poll poll) {
-        if (poll.getVotePerChoice().isEmpty())
-            return;
+    public void viewChoices(Poll poll)  throws SQLException{
+             System.out.println(poll.getTopic());
+             int totalVotes=(choicesDao.getTotalVotesForPoll(poll)==0?1:choicesDao.getTotalVotesForPoll(poll));
+             List<Choice> choices=choicesDao.getChoicesForPoll(poll);
+             int i=0;
+             for(Choice c:choices){
+                   System.out.printf("%d. %s(%.0f%% )%n",++i,c.getChoice(),((double) c.getTotalVoters() / totalVotes) * 100 );
 
-        System.out.println("     "+poll.getVoters().size()+" votes");
-        int i = 0;
-        for (String key : poll.getVotePerChoice().keySet()) {
-            if(poll.getVoters().isEmpty()){
-                System.out.println((++i) + " " + key + "( 0 votes ) " );
-            }
-            else {
-                System.out.println((++i) + " " + key + "(" + ((double) poll.getVotePerChoice().get(key) / poll.getVoters().size()) * 100 + "% )");
+             }
+    }
+
+
+
+    public int pickPoll(String message, List<Poll> pollslist) {
+        System.out.println(message);
+        int index=0;
+        while (index==0) {
+            try {
+                index = Integer.parseInt(scanner.nextLine());
+                if (index > pollslist.size()  || index  <1){
+                    System.out.println("invalid input. try again.");
+                   index=0;
+                }
+
+            } catch (NumberFormatException e) {
+                throw new RuntimeException(e);
             }
         }
-    }
-
-    public Poll pickPoll(String message, List<Poll> pollslist) {
-        System.out.println(message);
-
-        int choice = Integer.parseInt(scanner.nextLine());
-
-        return pollslist.get(choice - 1);
+        return index;
 
     }
 
-    public String pickOption(String message, Poll poll) {
+    public int  pickOption(String message,Poll poll) throws SQLException {
         viewChoices(poll);
+        List<Choice> choices=choicesDao.getChoicesForPoll(poll);
         System.out.println(message);
-        int choice = Integer.parseInt(scanner.nextLine());
-        String key = null;
-        int i = 0;
-        for (String key1 : poll.getVotePerChoice().keySet()) {
-            if (i++ == choice - 1) {
-                key = key1;
-                break;
-            }
+        int index=0;
+        while (index==0) {
+            try {
+                index = Integer.parseInt(scanner.nextLine());
+                if (index > choices.size() || index <1){
+                    System.out.println("invalid input. try again.");
+                    index=0;
+                }
 
+            } catch (NumberFormatException e) {
+                throw new RuntimeException(e);
+            }
         }
-        return key;
+        return index;
+
+
     }
 
     //main functionalities
 
-    public  void seeProfile(User user){
-         if(user.getUserVotedPolls().isEmpty()){
+    public  void seeProfile(User user) throws SQLException{
+        List<Poll> userVotedPolls=votersDao.getUserVotedPolls(user);
+        List<Poll> userCreatedPolls=pollsDao.getUserCreatedPolls(user);
+         if(userVotedPolls.isEmpty()){
              System.out.println("you haven't voted to any polls yet.");
+
+
          }else {
              System.out.println(user.getUsername() + " \nmost recent voted polls : ");
 
-             for (int i = 0; i < user.getUserVotedPolls().size() - 1 && i < 10; i++) {
-                 Poll poll = user.getUserVotedPolls().get(i);
-                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus() == Poll.status.ACTIVE ? "Active" : "Closed") + "]");
+             for (int i = 0; i < userVotedPolls.size()  && i < 10; i++) {
+                 Poll poll = userVotedPolls.get(i);
+                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus().equals("ACTIVE") ? "Active" : "Closed") + "]");
 
              }
          }
-         if(user.getUserCreatedPolls().isEmpty()){
+         if(userCreatedPolls.isEmpty()){
              System.out.println("you haven't created any polls yet.");
          }
          else {
-             System.out.println(user.getUsername() + " \nmost recent created  polls : ");
-             for (int i = 0; i < user.getUserVotedPolls().size() - 1 && i < 10; i++) {
-                 Poll poll = user.getUserCreatedPolls().get(i);
-                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus() == Poll.status.ACTIVE ? "Active" : "Closed") + "]");
+             System.out.println( " \nmost recent created  polls : ");
+             for (int i = 0; i < userCreatedPolls.size() && i < 10; i++) {
+                 Poll poll = userCreatedPolls.get(i);
+                 System.out.println("        " + poll.getTopic() + "[" + (poll.getStatus().equals("ACTIVE") ? "Active" : "Closed") + "]");
              }
          }
     }
 
-    public User registerUser() {
+
+
+    public User registerUser()  throws SQLException{
         //get valid username
         String name = getInfo("enter user name: ");
-        while (isUserNameTaken(name) || name.length() < 6) {
+        while (!isUserNameAvailable(name) || name.length() < 6) {
             if (name.length() < 6)
                 System.out.println("user name length should be greater than 6 characters,try another.");
             else
                 System.out.println("user name is taken,try another.");
             name = getInfo("enter user name: ");
         }
+
         //get valid password
         String password ;
         int digitCount;
@@ -243,21 +177,21 @@ public class Manager {
         } while (password.length() < 6 || digitCount < 3);
 
         User user = new User(name,password);
-        userList.add(user);
-        exportUsers();            //userList in the database should be modified as well
+        usersDao.addUser(user);     //userList in the database should be modified as well
+
         System.out.println("you have successfully registered as "+user.getUsername()+" and your password is "+user.getPassword());
         return  user;
     }
 
-    public synchronized  void createPoll(User user) {
+    public synchronized  void createPoll(User user) throws SQLException {
 
         if (user == null) {
             return;
         }
-        String topic = null;
-        int days = 0;
-        int hours = 0;
-        int minutes = 0;
+        String topic ;
+        int days ;
+        int hours ;
+        int minutes ;
         while (true) {
             try {
                 System.out.println("Enter the topic for the poll: ");
@@ -277,8 +211,10 @@ public class Manager {
         }
         Duration duration = Duration.ofDays(days).plusHours(hours).plusMinutes(minutes);
 
-        Poll poll = new Poll(topic, duration);              //every poll will have a timer that automatically close it when expiry date is reached.
-        new Thread(() -> {
+        Poll poll = new Poll(topic, user,"ACTIVE",duration);     //every poll will have a timer that automatically close it when expiry date is reached.
+        pollsDao.addPoll(poll);
+
+        new Thread (() -> {
             try {
                 Thread.sleep(duration.toMillis());
             } catch (InterruptedException e) {
@@ -286,11 +222,14 @@ public class Manager {
             }
 
             poll.setStatus();
-            exportPolls();
-        }).start();
+            try {
+                pollsDao.setPollStatus(poll);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
-        pollList.add(poll);
-        user.getUserCreatedPolls().add(poll);
+        } ).start();
+
         System.out.println("enter  choices one by one and enter 1 when you finish: ");
         int i = 1;
         while (true) {
@@ -298,134 +237,91 @@ public class Manager {
             String option = scanner.nextLine();
             if (option.trim().equals("1"))
                 break;
-            if (poll.getVotePerChoice().containsKey(option)) {
+            if (choicesDao.isChoicePresent(option)) {
                 System.out.println("choice already present.");
-            } else {
-                poll.getVotePerChoice().put(option, 0);
+            }
+            else {
+                choicesDao.addChoice(poll,new Choice(option,0));
                 i++;
             }
         }
         System.out.println("poll  created , expires at " + poll.getExpiryDateTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy  HH:mm:ss")));
-        exportPolls();         //pollList is updated
-        exportUsers();        //user userCreatedPoll list  is updated
         viewChoices(poll);
+
     }
 
-    public synchronized  void   vote(User voter){      // vote is Synchronized b/c  we don't want poll timer thread to interrupt in the middle leading to inconsistent state of a poll
+    public synchronized  void   vote(User voter) throws SQLException{      // vote is Synchronized b/c  we don't want poll timer thread to interrupt in the middle leading to inconsistent state of a poll
         //but this also prevents multiple users from voting on the same poll at the same time , they have to take turns
         //future fix, apply concurrency concept
 
         if(voter==null){
             return;
         }
-        List<Poll> activePolls=getActivePolls();
+        List<Poll> activePolls=pollsDao.getActivePolls();
 
         if(activePolls.isEmpty()){
             System.out.println("There are no active polls for now. ");
             return;
         }
+
         System.out.println("here are a list of currently active polls: ");
         viewPolls(activePolls);
+        Poll poll=activePolls.get(pickPoll("enter the number of poll you want to vote : ", activePolls)-1);
 
-        Poll poll=pickPoll("enter the number of poll you want to vote : ", activePolls);
+        if(votersDao.hasVoted(voter,poll)){
+            System.out.println("you already voted.");
+            return;
 
-        for(User user:poll.getVoters()){    //user can't vote multiple times in a single poll
-            if(user.getUsername().equals(voter.getUsername())){
-                System.out.println("you already voted.");
-                return;
-            }
         }
-
-        String key=pickOption("enter the number written before the  choice you want to vote: ",poll);
-
+        List<Choice> choices=choicesDao.getChoicesForPoll(poll);
+        int index=pickOption("enter the number written before the  choice you want to vote: ",poll);
+        Choice choice=choices.get(index-1);
 
         if(LocalDateTime.now().isAfter(poll.getExpiryDateTime())){  // we have to make sure poll expiry time hasn't passed before recording the vote
-            poll.setStatus();       //change poll status to expired
-            exportPolls();
+            poll.setStatus(); //change poll status to expired
+            pollsDao.setPollStatus(poll);
             System.out.println("poll has expired.");
             return;
         }
-        voter.getUserVotedPolls().add(poll);
-        poll.getVotePerChoice().put(key,poll.getVotePerChoice().get(key)+1);
-        poll.getVoters().add(voter);
-        exportPolls();
-        exportUsers();
-        System.out.println("☑ "+key+"\n");
+        votersDao.recordVote(poll,voter);
+        choicesDao.updateNumberOFVotes(choice);
+        choice.increment();
+
+        System.out.println("☑ "+choice.getChoice()+"\n");
         viewChoices(poll);
 
     }
 
-    public  synchronized  void closePoll(User admin){// same issue as vote method
-         importUsers();
-
+    public  synchronized  void closePoll(User admin) throws SQLException{// same issue as vote method
 
         if(admin==null)
             return;
-        List<Poll> pollList=getActivePolls();
+        List<Poll> pollList=pollsDao.getUserCreatedPolls(admin);
+
         if(pollList.isEmpty()){
             System.out.println("no active poll present to close. ");
               return;
         }
         viewPolls(pollList);
-        Poll poll=pickPoll("choose poll you want to remove(only if you are admin of the poll): ",pollList);
-       for(Poll poll1: admin.getUserCreatedPolls()){
-           if(poll1.getTopic().equals(poll.getTopic())){
-               poll.setStatus();
-               exportPolls();
-               exportUsers();      // b/c poll status inside user userCreatedPolls  list is changed
-               System.out.println(" poll successfully closed.");
-               showResult(poll);
-           }
-       }
-    }
-    public List<Poll>  top5MostVotedActivePolls(){  //uses insertion sort for ordering polls in decreasing order in the array
-         Poll[] topPolls=new Poll[5];
-         int entries=0;     // how many polls are there  on topPolls currently
-         List<Poll> activePolls=getActivePolls();
-         if(activePolls.isEmpty()){
-             return null;
-         }
-         for(Poll poll:activePolls){
-            if(entries< 5||poll.getVoters().size()>topPolls[4].getVoters().size()){
-                   if(entries< 5){
-                       entries++;
-                   }
-                   int j=entries-1;
-                   while (j>0&&topPolls[j-1].getVoters().size()<poll.getVoters().size()){
-                        topPolls[j-1]=topPolls[j];
-                        j--;
-                   }
-                   topPolls[j]=poll;
-            }
-         }
-         return Arrays.asList(topPolls);
+
+        Poll poll=pollList.get(pickPoll("choose poll you want to remove ",pollList)-1);
+
+        pollsDao.setPollStatus(poll);
+        poll.setStatus();
+        System.out.println("poll is closed. showing result of the poll...");
+        showResult(poll);
     }
 
-     public List<User>  top5MostActiveUsers(){
-        User[] mostActiveUsers=new User[5];
-         int entries=0;
-         if(userList.isEmpty()){
-             return null;
-         }
 
-         for(User user: userList){
-
-             if (entries< 5||user.getUserVotedPolls().size()>mostActiveUsers[4].getUserVotedPolls().size()){
-                 if(entries< 5){
-                     entries++;
-                 }
-                 int j=entries-1;
-                 while (j>0&&mostActiveUsers[j-1].getUserVotedPolls().size()<user.getUserVotedPolls().size()){
-                     mostActiveUsers[j-1]=mostActiveUsers[j];
-                     j--;
-                 }
-                 mostActiveUsers[j]=user;
-             }
-         }
-         return Arrays.asList(mostActiveUsers);
+    public List<Poll>  top5MostVotedActivePolls() throws SQLException{  //uses insertion sort for ordering polls in decreasing order in the array
+        return votersDao.getTop5MostVotedPolls();
     }
 
-    public void Dashboard(){
+     public List<User>  top5MostActiveUsers() throws SQLException{
+         return votersDao.getTop5MostActiveUsers();
+    }
+
+    public void Dashboard() throws SQLException{
         System.out.println("\nwhat is trending on Opinion Hub?    \n");
         List<Poll> pollList=top5MostVotedActivePolls();
         if(pollList!=null&&!pollList.contains(null)){
@@ -439,12 +335,12 @@ public class Manager {
             System.out.println("\nhere are the top 5 most active users  on Opinion Hub right now, you can be one of them.\n ");
             int i=1;
             for(User user:usersList1){
-                System.out.println((i++)+". "+user.getUsername()+" with "+user.getUserVotedPolls().size()+" votes.");
+                System.out.println((i++)+". "+user.getUsername()+" with "+votersDao.getUserVotedPolls(user).size()+" votes.");
             }
         }
     }
 
-    public void seeResultOfClosedPolls(){ //choosing is much easier than searching by topic plus user may input wrong topic
+    public void seeResultOfClosedPolls() throws SQLException{ //choosing is much easier than searching by topic plus user may input wrong topic
         List<Poll> pollList=getClosedPolls();
         if(pollList.isEmpty()){
             System.out.println("no closed polls yet.");
@@ -452,24 +348,18 @@ public class Manager {
         }
         System.out.println("Here are a list of closed polls: ");
         viewPolls(pollList);
-        Poll poll=pickPoll("Here are a list of closed polls: ",pollList);
+        Poll poll=pollList.get(pickPoll("pick a poll to view result: ",pollList)-1);
         showResult(poll);
 
     }
 
-    public  void showResult(Poll poll){
-        if(poll.getVotePerChoice().isEmpty()){
+    public  void showResult(Poll poll) throws SQLException{
+        Choice choice=choicesDao.getWinnerOpinionTotalVotes(poll);
+        if(choice==null){
             return;                   //poll closed without vote have no result .
         }
         viewChoices(poll);
-        int  winnerVotes=0;
-        String winnerOpinion="null";
-        for(String key:poll.getVotePerChoice().keySet()){
-            if(poll.getVotePerChoice().get(key)>winnerVotes){
-                winnerVotes=poll.getVotePerChoice().get(key);
-                winnerOpinion=key;
-            }
-        }
-        System.out.println("\n\n       most popular opinion:   \" "+winnerOpinion+"\"   with "+winnerVotes +" votes.\n");
+
+        System.out.println("\n\n       most popular opinion: \" "+choice.getChoice()+"\"  with "+choice.getTotalVoters() +" votes.\n");
     }
 }

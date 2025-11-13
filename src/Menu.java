@@ -1,15 +1,27 @@
+import java.sql.SQLException;
 import java.util.Scanner;
 
 public class Menu {
     private final Scanner scanner=new Scanner(System.in);
-    private final  Manager manager=new Manager();
-    public void menu() {
+    private final  Manager manager;
+    private final DataBaseConnection dataBaseConnection;
+    public Menu(DataBaseConnection dataBaseConnection){
+         this.dataBaseConnection=dataBaseConnection;
+         manager=new Manager(dataBaseConnection);
+
+    }
+    public void menu() throws SQLException  {
        System.out.println("welcome to Opinion Hub!");
-       int choice=acceptUserChoice();
-        User user =getUser(choice);
+        User user;
+        do {
+           int choice=acceptUserChoice();
+           user = getUser(choice);
+
+       } while (user==null);
         System.out.println("Welcome " + user.getUsername()+"\n");
         while (true) {
-            try {
+            int  choice=0;
+
                 System.out.println("""
                         what would you like to do:
                                1.see what's trending
@@ -24,8 +36,13 @@ public class Menu {
                     
                         
                         """);
+                try {
 
                 choice = Integer.parseInt(scanner.nextLine());
+                if (choice>7||choice<1)
+                    throw new NumberFormatException("invalid option number, try again");
+
+
             } catch (NumberFormatException e) {
                System.out.println("invalid option number, try again");
             }
@@ -50,8 +67,7 @@ public class Menu {
                     manager.seeResultOfClosedPolls();
                     break;
                 case 7:
-
-                     return;
+                    System.exit(1);
             }
 
 
@@ -77,7 +93,7 @@ public class Menu {
        return choice;
 
     }
-    public User getUser(int choice){
+    public User getUser(int choice) throws SQLException{
         User user;
         if (choice == 1) {
             user = manager.registerUser();        //new user created and added to userList

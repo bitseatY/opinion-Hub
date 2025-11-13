@@ -1,29 +1,30 @@
-import java.io.Serializable;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 
-public class Poll implements Serializable {
+
+public class Poll  {
     private  final String topic;
-    public   enum  status{ACTIVE,EXPIRED};
-    private status currentStatus;
+    private final User creator;
+    private   String currentStatus;
     private  final LocalDateTime expiryDateTime;
-    private final HashMap<String, Integer> votePerChoice;
-    private  final List<User> voters;
 
-    public Poll(String topic, Duration duration) {
-        currentStatus=status.ACTIVE ;          //poll is active when created
+    public Poll(String topic,User creator,String currentStatus, Duration duration) {
+        this.creator=creator;
         this.topic = topic;
-        voters=new ArrayList<>();
-        votePerChoice = new HashMap<>();
-        expiryDateTime=LocalDateTime.now().plus(duration);  // expires at poll created time  plus duration
+        expiryDateTime=LocalDateTime.now().plus(duration);// expires at poll created time  plus duration
+       this.currentStatus=currentStatus;
     }
-    public  synchronized void  setStatus() {
-        if(currentStatus==status.ACTIVE)
-            currentStatus=status.EXPIRED;
 
+
+    public  synchronized void  setStatus() {
+        if(currentStatus.equals("ACTIVE"))
+            currentStatus="EXPIRED";
+
+    }
+
+    public User getCreator() {
+        return creator;
     }
 
     public LocalDateTime getExpiryDateTime() {
@@ -31,25 +32,13 @@ public class Poll implements Serializable {
         return expiryDateTime;
     }
 
-    public   synchronized status getStatus() {
 
+    public synchronized String getStatus(){
         return currentStatus;
     }
+
     public String getTopic() {
 
         return topic;
     }
-
-    public List<User> getVoters() {
-
-        return voters;
-    }
-
-    public HashMap<String, Integer> getVotePerChoice() {
-
-        return votePerChoice;
-    }
-
-
-
 }
