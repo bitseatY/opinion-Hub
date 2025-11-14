@@ -29,7 +29,7 @@ public class ChoicesDao {
            if (rs.next())
                return new Choice(rs.getString("choice"), rs.getInt("total_votes"));
        }
-       System.out.println("nulllll");
+
 
        return null;
    }
