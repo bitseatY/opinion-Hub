@@ -11,7 +11,7 @@ public class PollsDao {
 
      }
      public  void addPoll(Poll poll) throws SQLException {
-            String query="insert into polls(creater_id,topic,state,expirydate) values(?,?,?,?)";
+            String query="insert into polls(creator_id,topic,status,ex_date) values(?,?,?,?)";
             try(PreparedStatement ps=connection.prepareStatement(query)){
                 ps.setInt(1,new UsersDao(connection).getUserId(poll.getCreator()));
                 ps.setString(2,poll.getTopic());
@@ -26,8 +26,9 @@ public class PollsDao {
              ps.setInt(1,id);
              ResultSet rs=ps.executeQuery();
              if(rs.next())
-                 return new Poll(rs.getString("topic"),new UsersDao(connection).findUserById(rs.getInt("creater_id")),rs.getString("state"),
-                         Duration.between(LocalDateTime.now(),rs.getTimestamp("expirydate").toLocalDateTime())
+                 return new Poll(rs.getString("topic"),new UsersDao(connection).findUserById(rs.getInt("creator_id"))
+                         ,rs.getString("status"),
+                         Duration.between(LocalDateTime.now(),rs.getTimestamp("ex_date").toLocalDateTime())
                          );
 
          }
@@ -71,8 +72,8 @@ public class PollsDao {
              ResultSet rs= ps.executeQuery();
              while (rs.next())
                  pollList.add(new Poll(rs.getString("topic"),
-                          new UsersDao(connection).findUserById(rs.getInt("creater_id")),rs.getString("state"),
-                                  Duration.between(LocalDateTime.now(),rs.getTimestamp("expirydate").toLocalDateTime())));
+                          new UsersDao(connection).findUserById(rs.getInt("creator_id")),rs.getString("status"),
+                                  Duration.between(LocalDateTime.now(),rs.getTimestamp("ex_date").toLocalDateTime())));
          }
         return pollList;
 
@@ -80,21 +81,21 @@ public class PollsDao {
 
      public List<Poll> getUserCreatedPolls(User user) throws SQLException{
           List<Poll> pollList=new ArrayList<>();
-         String query="select * from polls where creater_id=? ";
+         String query="select * from polls where creator_id=? ";
          try(PreparedStatement ps= connection.prepareStatement(query)){
              ps.setInt(1,new UsersDao(connection).getUserId(user));
              ResultSet rs= ps.executeQuery();
              while (rs.next())
                  pollList.add(new Poll(rs.getString("topic"),
-                         new UsersDao(connection).findUserById(rs.getInt("creater_id")),rs.getString("state"),
-                         Duration.between(LocalDateTime.now(),rs.getTimestamp("expirydate").toLocalDateTime())));
+                         new UsersDao(connection).findUserById(rs.getInt("creator_id")),rs.getString("status"),
+                         Duration.between(LocalDateTime.now(),rs.getTimestamp("ex_date").toLocalDateTime())));
          }
          return pollList;
 
 
      }
       public void setPollStatus(Poll poll) throws SQLException{
-          String query="update polls set state='EXPIRED' where id=?";
+          String query="update polls set status='EXPIRED' where id=?";
           try (PreparedStatement ps=connection.prepareStatement(query)){
               ps.setInt(1,new PollsDao(connection).getPollId(poll));
               ps.executeUpdate();
